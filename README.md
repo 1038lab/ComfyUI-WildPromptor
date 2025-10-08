@@ -2,6 +2,8 @@
 
 WildPromptor is a tool for efficient prompt generation and management in ComfyUI, specifically crafted to streamline the process of prompt generation and management. It empowers users to effortlessly create, organize, and customize their creative content, transforming chaotic workflows into a structured and intuitive experience.
 
+![WildPromptor_v1 0 0_note_sample](https://github.com/user-attachments/assets/962eccea-c894-42d0-905f-31f9b21611fe)
+
 [English ](README.md) / [繁體中文 ](README.zh-tw.md) / [简体中文 ](README.zh-cn.md)
 
 ## Introduction
@@ -22,6 +24,8 @@ In a nutshell, WildPromptor is your creative companion, making AI art fun, intui
 
 ### Data Organization
 WildPromptor uses a flexible folder structure in the `data` directory:
+
+![prompt_List_Sample](https://github.com/user-attachments/assets/3b17c9f2-04c0-4394-9673-3c3ec8898887)
 
 - **Subject**: Keywords for characters, objects, and main subjects
 - **Environment**: Keywords for settings, landscapes, and scenarios
@@ -84,3 +88,4 @@ WildPromptor offers a balance between controlled input and serendipitous discove
 ### 🛠️ Advanced Tools
 - **Data To Prompt List**: Turn any text file into a prompt list. Forward, backward, random - you choose the flow!
 - **WildPromptor Generator**: The power duo! List + Generator = Prompt magic. Perfect for when you want full control over your creative chaos.
+
