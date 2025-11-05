@@ -1,2 +1,17 @@
-google-generativeai
+# Core dependencies
+google-generativeai>0.4.1
 requests
+
+# AI and ML dependencies
+transformers>=4.51.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Image processing
+pillow>=9.0.0
+
+# Model management
+huggingface-hub>=0.16.0
+
+# Ollama support
+ollama>=0.1.0
