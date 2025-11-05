@@ -27,6 +27,7 @@ const NODE_COLORS = {
     "WildPromptor_LLMAPI": "ai",
     "wildpromptor_JanusPro": "ai",
     "WildPromptor_BLIP": "ai",
+    "WildPromptor_hfgpt": "ai",
 
     // prompt Tools
     "PromptCleaner": "tools",
