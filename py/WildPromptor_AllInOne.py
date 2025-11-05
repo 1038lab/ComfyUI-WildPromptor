@@ -3,12 +3,15 @@ import random
 import json
 from typing import Tuple, List, Dict, Any
 
-class WildPromptorAllInOne:
+class WildPromptor_AllInOne:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "process_prompt"
     OUTPUT_IS_LIST = (True,)
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
+    
+    # Class-level cache shared across all instances
+    _file_cache = {}
 
     def __init__(self):
         self.config = self.load_config()
@@ -20,8 +23,18 @@ class WildPromptorAllInOne:
             return json.load(f)
 
     def read_file_options(self, file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return [line.strip() for line in f if line.strip()]
+        """Read file options with class-level caching"""
+        if file_path in self._file_cache:
+            return self._file_cache[file_path]
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                options = [line.strip() for line in f if line.strip()]
+            self._file_cache[file_path] = options
+            return options
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}")
+            return []
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -53,32 +66,81 @@ class WildPromptorAllInOne:
     def process_prompt(self, batch_size: int = 1, seed: int = 0, allow_duplicates: bool = True, **kwargs):
         random.seed(seed)
         all_prompts = []
+        used_values_map = {}  # Track used values for each category when not allowing duplicates
 
-        for i in range(batch_size):
-            prompt_parts = []
-            for key, value in kwargs.items():
-                if key in ["batch_size", "seed", "allow_duplicates"]:
-                    continue
-                if value == "❌disabled":
-                    continue
-                
+        # Prepare active contents
+        active_contents = {}
+        for key, value in kwargs.items():
+            if key in ["batch_size", "seed", "allow_duplicates"] or value == "❌disabled":
+                continue
+            
+            if value in ["🎲Random", "🔢ordered"]:
                 folder, cleaned_name = key.split(' - ', 1)
                 original_name = self.get_original_filename(folder, cleaned_name.split(' [')[0])
                 file_path = os.path.join(self.data_path, folder, f"{original_name}.txt")
                 options = self.read_file_options(file_path)
+                if options:
+                    active_contents[key] = {'options': options, 'mode': value}
+                    if not allow_duplicates:
+                        used_values_map[key] = set()
+
+        for i in range(batch_size):
+            prompt_parts = []
+            
+            for key, value in kwargs.items():
+                if key in ["batch_size", "seed", "allow_duplicates"] or value == "❌disabled":
+                    continue
                 
-                if value == "🎲Random":
-                    if options:
+                if key in active_contents:
+                    data = active_contents[key]
+                    options = data['options']
+                    mode = data['mode']
+                    
+                    if mode == "🎲Random":
                         if allow_duplicates:
                             prompt_parts.append(random.choice(options))
                         else:
-                            prompt_parts.append(random.sample(options, 1)[0])
-                elif value == "🔢ordered":
-                    if options:
+                            # Check if all values are used
+                            if len(used_values_map[key]) >= len(options):
+                                used_values_map[key].clear()
+                            
+                            available = [opt for opt in options if opt not in used_values_map[key]]
+                            if available:
+                                chosen = random.choice(available)
+                                used_values_map[key].add(chosen)
+                                prompt_parts.append(chosen)
+                    
+                    elif mode == "🔢ordered":
                         index = i % len(options)
-                        prompt_parts.append(options[index])
-                elif value in options:
-                    prompt_parts.append(value)
+                        current_value = options[index]
+                        
+                        if allow_duplicates:
+                            prompt_parts.append(current_value)
+                        else:
+                            # Try to find an unused value
+                            if len(used_values_map[key]) >= len(options):
+                                used_values_map[key].clear()
+                            
+                            if current_value not in used_values_map[key]:
+                                used_values_map[key].add(current_value)
+                                prompt_parts.append(current_value)
+                            else:
+                                # Find next unused value
+                                for j in range(len(options)):
+                                    next_idx = (index + j) % len(options)
+                                    next_val = options[next_idx]
+                                    if next_val not in used_values_map[key]:
+                                        used_values_map[key].add(next_val)
+                                        prompt_parts.append(next_val)
+                                        break
+                else:
+                    # Specific value selected
+                    folder, cleaned_name = key.split(' - ', 1)
+                    original_name = self.get_original_filename(folder, cleaned_name.split(' [')[0])
+                    file_path = os.path.join(self.data_path, folder, f"{original_name}.txt")
+                    options = self.read_file_options(file_path)
+                    if value in options:
+                        prompt_parts.append(value)
 
             if prompt_parts:
                 all_prompts.append(", ".join(prompt_parts))
@@ -96,9 +158,9 @@ class WildPromptorAllInOne:
         return cleaned_name
 
 NODE_CLASS_MAPPINGS = {
-    "WildPromptorAllInOne": WildPromptorAllInOne
+    "WildPromptor_AllInOne": WildPromptor_AllInOne
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "WildPromptorAllInOne": "WildPromptor All-in-One 📋+🔀"
+    "WildPromptor_AllInOne": "WildPromptor All-in-One 📋+🔀"
 }

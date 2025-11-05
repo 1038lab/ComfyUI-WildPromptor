@@ -3,16 +3,18 @@ import random
 import json
 from typing import Tuple, List, Dict, Any
 
-class AllInOneList:
+class WildPromptor_AllInOneList:
     RETURN_TYPES = ("DPROMPT_DATA",)
     RETURN_NAMES = ("selected_options",)
     FUNCTION = "select_options"
     CATEGORY = "🧪AILab/🧿WildPromptor/📋Prompts List"
+    
+    # Class-level cache shared across all instances
+    _file_cache = {}
 
     def __init__(self):
         self.config = self.load_config()
         self.data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), self.config['data_path'])
-        self.file_cache = {}
 
     def load_config(self):
         config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
@@ -35,18 +37,18 @@ class AllInOneList:
                         options = self.read_file_options(file_path)
                         item_count = len(options)
                         display_name = f"{folder} - {cleaned_name} [{item_count}]"
-                        options = self.read_file_options(os.path.join(folder_path, file))
                         inputs["optional"][display_name] = (["❌disabled", "🎲Random", "🔢ordered"] + options, {"default": "❌disabled"})
         
         return inputs
 
     def read_file_options(self, file_path: str) -> List[str]:
-        if file_path in self.file_cache:
-            return self.file_cache[file_path]
+        """Read file options with class-level caching for better performance"""
+        if file_path in self._file_cache:
+            return self._file_cache[file_path]
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
                 options = [line.strip() for line in file if line.strip()]
-            self.file_cache[file_path] = options
+            self._file_cache[file_path] = options
             return options
         except FileNotFoundError:
             print(f"File not found: {file_path}")
@@ -61,17 +63,19 @@ class AllInOneList:
             print("Warning: No options selected.")
         return (selected_options,)
 
-class WildPromptorGenerator:
+class WildPromptor_Generator:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "process_prompt"
     OUTPUT_IS_LIST = (True,)
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
+    
+    # Class-level cache shared across all instances  
+    _file_cache = {}
 
     def __init__(self):
         self.config = self.load_config()
         self.data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), self.config['data_path'])
-        self.file_cache = {}
 
     def load_config(self):
         config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
@@ -137,12 +141,13 @@ class WildPromptorGenerator:
         return cleaned_name.split(' [')[0]
 
     def read_file_options(self, file_path: str) -> List[str]:
-        if file_path in self.file_cache:
-            return self.file_cache[file_path]
+        """Read file options with class-level caching for better performance"""
+        if file_path in self._file_cache:
+            return self._file_cache[file_path]
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
                 options = [line.strip() for line in file if line.strip()]
-            self.file_cache[file_path] = options
+            self._file_cache[file_path] = options
             return options
         except FileNotFoundError:
             print(f"File not found: {file_path}")
@@ -152,11 +157,11 @@ class WildPromptorGenerator:
             return []
 
 NODE_CLASS_MAPPINGS = {
-    "AllInOneList": AllInOneList,
-    "WildPromptorGenerator": WildPromptorGenerator
+    "WildPromptor_AllInOneList": WildPromptor_AllInOneList,
+    "WildPromptor_Generator": WildPromptor_Generator
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AllInOneList": "All-In-One List 📋",
-    "WildPromptorGenerator": "WildPromptor Generator 🔀"
+    "WildPromptor_AllInOneList": "All-In-One List 📋",
+    "WildPromptor_Generator": "WildPromptor Generator 🔀"
 }

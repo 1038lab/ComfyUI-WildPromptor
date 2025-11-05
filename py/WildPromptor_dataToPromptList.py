@@ -9,7 +9,7 @@ class WildPromptor_DataToPromptList:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "path": ("STRING", {"default": "", "multiline": True, "placeholder": "file path", "tooltip": "Input file path(s). Multiple files can be separated by commas or newlines"}),
+                "text": ("STRING", {"forceInput": False, "multiline": True, "tooltip": "Direct text input, will be processed along with file input"}),
                 "separator": ("STRING", {"default": "","placeholder": "custom separator", "tooltip": "Separator for splitting text. default is empty for newline splitting"}),
                 "batch_size": ("INT", {"default": 1, "min": 0, "max": 1000, "tooltip": "Number of prompts to generate. Set 0 for all"}),
                 "count_start_from": ("INT", {"default": 1, "min": 1, "tooltip": "Starting index for prompt selection"}),
@@ -18,7 +18,7 @@ class WildPromptor_DataToPromptList:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "tooltip": "Random seed for reproducible results"}),
             },
             "optional": {
-                "text": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "Direct text input, will be processed along with file input"})
+                "path": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "File path input, will be processed along with text input"}),
             }
         }
 
@@ -26,7 +26,7 @@ class WildPromptor_DataToPromptList:
     RETURN_NAMES = ("prompt_list", "prompt_combined",)
     OUTPUT_IS_LIST = (True, False,)
     FUNCTION = "generate_prompts"
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
 
     def _split_and_clean(self, text, separator):
         """Split text by separator and clean the results."""
@@ -116,11 +116,19 @@ class WildPromptor_DataToPromptList:
             else:
                 if len(used_indices) >= len(available_indices):
                     break
-                while True:
-                    index = available_indices[i % len(available_indices)]
+                
+                # Find next unused index
+                attempts = 0
+                max_attempts = len(available_indices)
+                while attempts < max_attempts:
+                    index = available_indices[(i + attempts) % len(available_indices)]
                     if index not in used_indices:
                         used_indices.add(index)
                         break
+                    attempts += 1
+                else:
+                    # All indices used
+                    break
                 
             prompts.append(data[index])
 

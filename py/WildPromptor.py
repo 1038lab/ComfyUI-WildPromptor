@@ -23,6 +23,9 @@ class PromptListNode(BaseNode):
     RETURN_NAMES = ("prompt",)
     FUNCTION = "process_prompt"
     OUTPUT_IS_LIST = (True,)
+    
+    # Class-level cache shared across all instances
+    _file_contents_cache = {}
 
     def get_txt_file_names(self):
         return [f for f in os.listdir(self.data_path) if f.endswith(".txt")]
@@ -34,9 +37,17 @@ class PromptListNode(BaseNode):
         self.file_contents = self.load_file_contents()
 
     def load_file_contents(self):
+        """Load file contents with class-level caching for better performance"""
         file_contents = {}
         for filename in self.file_names:
-            file_contents[filename] = self.read_file_lines(filename)
+            file_path = os.path.join(self.data_path, filename)
+            # Use class-level cache
+            if file_path in self._file_contents_cache:
+                file_contents[filename] = self._file_contents_cache[file_path]
+            else:
+                content = self.read_file_lines(filename)
+                file_contents[filename] = content
+                self._file_contents_cache[file_path] = content
         return file_contents
 
     def read_file_lines(self, filename):
@@ -71,49 +82,123 @@ class PromptListNode(BaseNode):
             cleaned_name = original_name.split('.', 1)[-1] if '.' in original_name else original_name
             titles, contents = self.file_contents[filename]
             item_count = len(titles) if titles else len(contents)
-            # display_name = f"{self.FOLDER_NAME} - {cleaned_name} [{item_count}]"
             display_name = f"{cleaned_name} [{item_count}]"
             inputs["optional"][display_name] = (["❌disabled", "🎲Random", "🔢ordered"] + titles, {"default": "❌disabled"})
 
         inputs["optional"]["batch_size"] = ("INT", {"default": 1, "min": 1, "max": 1000})
+        inputs["optional"]["allow_duplicates"] = ("BOOLEAN", {"default": False})
         inputs["optional"]["seed"] = ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff})
+
         return inputs
 
-    def process_prompt(self, batch_size=1, seed=0, **kwargs):
+    def process_prompt(self, batch_size=1, seed=0, allow_duplicates=False, **kwargs):
         random.seed(seed)
         all_prompts = []
+        used_values_map = {}
+        active_contents = {}
+
+        for key, value in kwargs.items():
+            if key in ["batch_size", "seed", "allow_duplicates"]:
+                continue
+            if value in ["🎲Random", "🔢ordered"]:
+                cleaned_name = key.split(' [')[0]
+                original_name = self.get_original_filename(cleaned_name)
+                titles, contents = self.file_contents[original_name + '.txt']
+                if contents:
+                    active_contents[key] = contents
+                    if not allow_duplicates:
+                        used_values_map[key] = set()
+
+        if not allow_duplicates and active_contents:
+            max_possible_outputs = max(len(contents) for contents in active_contents.values())
+            batch_size = min(batch_size, max_possible_outputs)
 
         for _ in range(batch_size):
             prompt_parts = []
+            
             for key, value in kwargs.items():
-                if key in ["batch_size", "seed"]:
+                if key in ["batch_size", "seed", "allow_duplicates"]:
                     continue
-                if value == "🎲Random":
-                    cleaned_name = key.split(' [')[0]
-                    original_name = self.get_original_filename(cleaned_name)
-                    titles, contents = self.file_contents[original_name + '.txt']
-                    if contents:
-                        value = random.choice(contents)
-                elif value == "🔢ordered":
-                    cleaned_name = key.split(' [')[0]
-                    original_name = self.get_original_filename(cleaned_name)
-                    titles, contents = self.file_contents[original_name + '.txt']
-                    if contents:
-                        index = _ % len(contents)
-                        value = contents[index]
-                elif value not in ["❌disabled", "🎲Random", "🔢ordered"]:
-                    cleaned_name = key.split(' [')[0]
-                    original_name = self.get_original_filename(cleaned_name)
-                    titles, contents = self.file_contents[original_name + '.txt']
-                    if titles and value in titles:
-                        index = titles.index(value)
-                        value = contents[index]
-                if value not in ["❌disabled", "🎲Random", "🔢ordered"]:
-                    prompt_parts.append(str(value))
+                
+                current_value = self._get_value_for_key(
+                    key, value, active_contents, 
+                    used_values_map, allow_duplicates, _
+                )
+                
+                if current_value is not None:
+                    prompt_parts.append(str(current_value))
+
             if prompt_parts:
                 all_prompts.append(", ".join(prompt_parts))
 
         return (all_prompts,) if all_prompts else ([""],)
+
+    def _get_value_for_key(self, key, value, active_contents, used_values_map, allow_duplicates, current_index):
+        if value == "🎲Random":
+            return self._handle_random_mode(
+                key, active_contents, used_values_map, allow_duplicates
+            )
+        elif value == "🔢ordered":
+            return self._handle_ordered_mode(
+                key, active_contents, used_values_map, 
+                allow_duplicates, current_index
+            )
+        elif value not in ["❌disabled", "🎲Random", "🔢ordered"]:
+            return self._handle_specific_value(key, value)
+        return None
+
+    def _handle_random_mode(self, key, active_contents, used_values_map, allow_duplicates):
+        if key not in active_contents:
+            return None
+            
+        contents = active_contents[key]
+        if allow_duplicates:
+            return random.choice(contents)
+            
+        if len(used_values_map[key]) >= len(contents):
+            used_values_map[key].clear()
+            
+        available_contents = [c for c in contents if c not in used_values_map[key]]
+        if available_contents:
+            chosen_value = random.choice(available_contents)
+            used_values_map[key].add(chosen_value)
+            return chosen_value
+        return None
+
+    def _handle_ordered_mode(self, key, active_contents, used_values_map, allow_duplicates, current_index):
+        if key not in active_contents:
+            return None
+            
+        contents = active_contents[key]
+        index = current_index % len(contents)
+        current_value = contents[index]
+        
+        if allow_duplicates:
+            return current_value
+            
+        if len(used_values_map[key]) >= len(contents):
+            used_values_map[key].clear()
+            
+        if current_value not in used_values_map[key]:
+            used_values_map[key].add(current_value)
+            return current_value
+            
+        for i in range(len(contents)):
+            next_index = (index + i) % len(contents)
+            next_value = contents[next_index]
+            if next_value not in used_values_map[key]:
+                used_values_map[key].add(next_value)
+                return next_value
+        return None
+
+    def _handle_specific_value(self, key, value):
+        cleaned_name = key.split(' [')[0]
+        original_name = self.get_original_filename(cleaned_name)
+        titles, contents = self.file_contents[original_name + '.txt']
+        if titles and value in titles:
+            index = titles.index(value)
+            return contents[index]
+        return None
 
     def get_original_filename(self, cleaned_name):
         for filename in self.file_names:
@@ -125,7 +210,7 @@ class PromptConcatNode(BaseNode):
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "process_prompt"
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -170,33 +255,12 @@ class PromptConcatNode(BaseNode):
         
         return (final_prompt,)
 
-    def process_prompt(self, prefix="", suffix="", separator="comma", remove_duplicates=False, sort=False, **kwargs):
-        prompt_parts = [part.strip() for part in [prefix] + list(kwargs.values()) + [suffix] if part and part.strip()]
-        
-        if not prompt_parts:
-            return ("",)
-        
-        if remove_duplicates:
-            prompt_parts = list(dict.fromkeys(prompt_parts))
-        
-        if sort:
-            middle_parts = prompt_parts[1:-1] if suffix else prompt_parts[1:]
-            middle_parts.sort()
-            prompt_parts = [prefix] + middle_parts + ([suffix] if suffix else [])
-        
-        final_prompt = {"comma": ", ", "space": " ", "newline": "\n"}[separator].join(prompt_parts)
-        
-        print(f"🔀 Prompt Concat output:\n{final_prompt}")
-        
-        return (final_prompt,)
-
 class PromptBuilder:
     RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("prompt", "content_only")  # 修改此处
-    # OUTPUT_IS_LIST = (False, False)
+    RETURN_NAMES = ("prompt", "content_only")
     OUTPUT_IS_LIST = (True, False)
     FUNCTION = "process_prompt"
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -210,7 +274,6 @@ class PromptBuilder:
         }
 
     def process_prompt(self, prefix: str = "", content: str = "", suffix: str = "") -> Tuple[List[str], str]:
-    # def process_prompt(self, prefix: str = "", content: str = "", suffix: str = "") -> List[str]:
         if isinstance(content, list):
             content = "\n".join(content)
 
@@ -223,9 +286,8 @@ class PromptBuilder:
 class KeywordPicker:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("picked_keywords",)
-  # OUTPUT_IS_LIST = (True,)
     FUNCTION = "pick_keywords"
-    CATEGORY = "🧪AILab/🧿WildPromptor/🔀Promptor"
+    CATEGORY = "🧪AILab/🧿WildPromptor"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -241,12 +303,18 @@ class KeywordPicker:
         }
 
     def pick_keywords(self, input_keywords="", keywords="", pick_count=1, pick_mode="🎲Random", seed=0):
-        combined_keywords = f"{input_keywords},{keywords}"
+        # Combine and clean keywords
+        parts = []
+        if input_keywords and input_keywords.strip():
+            parts.append(input_keywords.strip())
+        if keywords and keywords.strip():
+            parts.append(keywords.strip())
         
-        if not combined_keywords.strip():
+        if not parts:
             return ("",)
         
-        keyword_list = [kw.strip() for kw in combined_keywords.split(', ') if kw.strip()]
+        combined = ", ".join(parts)
+        keyword_list = [kw.strip() for kw in combined.split(',') if kw.strip()]
 
         if not keyword_list:
             return ("",)
@@ -257,7 +325,7 @@ class KeywordPicker:
         if pick_mode == "🎲Random":
             random.seed(seed)
             picked = random.sample(keyword_list, min(pick_count, len(keyword_list)))
-        else:  # ordered
+        else:
             picked = keyword_list[:pick_count]
         
         return (", ".join(picked),)
