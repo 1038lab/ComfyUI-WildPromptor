@@ -1,0 +1,45 @@
+  {
+  "gemini": {
+    "project_id": "Generative Language Client",
+    "model_id": "gemini-2.0-flash-exp",
+    "api_key": "your gemini api key",
+    "available_models": [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-2.0-flash-exp",
+      "gemini-1.5-flash-001",
+      "gemini-2.0-flash-exp",
+      "gemini-2.0-flash-thinking-exp-1219",
+      "gemini-pro-vision"
+    ]
+  },
+  "ollama": {
+    "url": "http://127.0.0.1:11434",
+    "model": "brxce/stable-diffusion-prompt-generator:latest",
+	"keep_alive_interval": 5,
+	"connection_timeout": 30
+  },
+  "HFGPT_repos": [
+    "Gustavosta/MagicPrompt-Stable-Diffusion",
+    "daspartho/prompt-extend",
+    "succinctly/text2image-prompt-generator",
+    "microsoft/Promptist",
+    "AUTOMATIC/promptgen-lexart",
+    "AUTOMATIC/promptgen-majinai-safe",
+    "AUTOMATIC/promptgen-majinai-unsafe",
+    "Gustavosta/MagicPrompt-Dalle",
+    "kmewhort/stable-diffusion-prompt-bolster",
+    "Ar4ikov/gpt2-650k-stable-diffusion-prompt-generator",
+    "Ar4ikov/gpt2-medium-650k-stable-diffusion-prompt-generator",
+    "crumb/bloom-560m-RLHF-SD2-prompter-aesthetic",
+    "Meli/GPT2-Prompt",
+    "DrishtiSharma/StableDiffusion-Prompt-Generator-GPT-Neo-125M"    
+  ],
+  "minicpm_models": [
+    "openbmb/MiniCPM-V-2_6-int4",
+    "openbmb/MiniCPM-Llama3-V-2_5-int4",
+    "openbmb/MiniCPM-V-4-int4",
+    "openbmb/MiniCPM-V-4_5-int4"
+  ],
+  "default_minicpm_model": "openbmb/MiniCPM-V-2_6-int4"
+}
