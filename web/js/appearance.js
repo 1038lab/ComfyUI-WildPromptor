@@ -21,13 +21,12 @@ const NODE_COLORS = {
     "WildPromptor_Enhancer": "ai",
     "WildPromptor_GeminiVision": "ai",
     "WildPromptor_Qwen": "ai",
-    "WildPromptor_hfgpt": "ai",
-    "WildPromptor_minicpm": "ai",
+    "WildPromptor_HFgpt": "ai",
+    "WildPromptor_Minicpm": "ai",
     "WildPromptor_Ollama": "ai",
     "WildPromptor_LLMAPI": "ai",
     "wildpromptor_JanusPro": "ai",
     "WildPromptor_BLIP": "ai",
-    "WildPromptor_hfgpt": "ai",
 
     // prompt Tools
     "PromptCleaner": "tools",
